@@ -8,7 +8,7 @@
 
 #define NUM_PIXELS 12
 
-#define ANIM_TYPES 4
+#define ANIM_TYPES 7
 Adafruit_NeoPixel ring = Adafruit_NeoPixel(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 
@@ -19,6 +19,8 @@ int showType = 0;
 void setup() {
   // start the ring and blank it out
   ring.begin();
+  // Used in setup, to modulate brightness use pixel sketch logic (range 0..255, from min to max)
+  ring.setBrightness(20);
   ring.show(); // Initialize all pixels to 'off'
 
 }
@@ -60,12 +62,18 @@ void startShow(int i) {
             break;
     case 3: colorWipe(ring.Color(0, 0, 255), 50);  // Blue
             break;
+    case 4: colorWipe(ring.Color(255, 0, 255), 50); // Magenta
+            break;
+    case 5: colorWipe(ring.Color(255, 255, 0), 50); // Greenish Yellow
+            break;
+    case 6: colorWipe(ring.Color(0, 255, 255), 50); // Light Blue
+            break;
   }
 }
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
-  for(uint16_t i=0; i<ring.numPixels(); i++) {
+  for (uint16_t i = 0; i < ring.numPixels(); i++) {
     ring.setPixelColor(i, c);
     ring.show();
     delay(wait);
