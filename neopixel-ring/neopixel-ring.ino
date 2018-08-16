@@ -1,18 +1,22 @@
 #include <Adafruit_NeoPixel.h>
-#define BUTTON_PIN   6    // Digital IO pin connected to the button.  This will be
+#define BUTTON_ANIM_PIN   6    // Digital IO pin connected to the button.  This will be
                           // driven with a pull-up resistor so the switch should
                           // pull the pin to ground momentarily.  On a high -> low
                           // transition the button press logic will execute.
+                          
+#define BUTTON_POWER_PIN 2 // Digital IO pin connected to the button that controls off/on leds state
 
 #define PIXEL_PIN    3    // Digital IO pin connected to the NeoPixels.
 
 #define NUM_PIXELS 12
 
-#define ANIM_TYPES 7
+#define ANIM_TYPES 7 // Number of animation types (controlled with the switch..case below)
+
 Adafruit_NeoPixel ring = Adafruit_NeoPixel(NUM_PIXELS, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-
-bool oldState = HIGH;
+// Init buttons states
+bool buttonLedOldState = HIGH;
+bool buttonPowerOldState = HIGH;
 int showType = 0;
 
 
@@ -20,54 +24,64 @@ void setup() {
   // start the ring and blank it out
   ring.begin();
   // Used in setup, to modulate brightness use pixel sketch logic (range 0..255, from min to max)
-  ring.setBrightness(20);
+  ring.setBrightness(30);
   ring.show(); // Initialize all pixels to 'off'
 
 }
 
 void loop() {
   // Get current button state.
-  bool newState = digitalRead(BUTTON_PIN);
+  bool buttonLedNewState = digitalRead(BUTTON_ANIM_PIN);
+  bool buttonPowerNewState = digitalRead(BUTTON_POWER_PIN);
 
+  // ANIMATION BUTTON LOGIC
   // Check if state changed from high to low (button press).
-  if (newState == LOW && oldState == HIGH) {
+  if (buttonLedNewState == LOW && buttonLedOldState == HIGH) {
     // Short delay to debounce button.
     delay(20);
     // Check if button is still low after debounce.
-    newState = digitalRead(BUTTON_PIN);
-    if (newState == LOW) {
-      
-      //showType++;
-      //if (showType > 9)
-      //  showType = 0;
+    buttonLedNewState = digitalRead(BUTTON_ANIM_PIN);
+    if (buttonLedNewState == LOW) {
       // Animation types range from 0 to ANIM_TYPES-1
       showType = (showType+1) % ANIM_TYPES;
       startShow(showType);
     }
   }
+  // SWITCH ON/OFF BUTTON LOGIC
+  if (buttonPowerNewState == LOW && buttonPowerOldState == HIGH) {
+    delay(20);
+    buttonPowerNewState = digitalRead(BUTTON_POWER_PIN);
+    if (buttonPowerNewState == LOW) {
+      // Turn off all the leds
+      colorWipe(ring.Color(0, 0, 0), 50); 
+    }
+  }
 
   // Set the last button state to the old state.
-  oldState = newState;
+  buttonLedOldState = buttonLedNewState;
+  buttonPowerOldState = buttonPowerNewState;
 
 }
 
 
 void startShow(int i) {
   switch(i){
-    case 0: colorWipe(ring.Color(0, 0, 0), 50);    // Black/off
+    case 0: colorWipe(ring.Color(255,255,255), 50);  // White
             break;
-    case 1: colorWipe(ring.Color(255, 0, 0), 50);  // Red
+    case 1: colorWipe(ring.Color(255, 129, 0), 50);  // Yellow/Orange
             break;
-    case 2: colorWipe(ring.Color(0, 255, 0), 50);  // Green
+    case 2: colorWipe(ring.Color(255, 0, 0), 50);    // Red
             break;
-    case 3: colorWipe(ring.Color(0, 0, 255), 50);  // Blue
+    case 3: colorWipe(ring.Color(194, 0, 255), 50);  // Purple
             break;
-    case 4: colorWipe(ring.Color(255, 0, 255), 50); // Magenta
+    case 4: colorWipe(ring.Color(0, 0, 255), 50);    // Blue
             break;
-    case 5: colorWipe(ring.Color(255, 255, 0), 50); // Greenish Yellow
+    case 5: colorWipe(ring.Color(0, 255, 255), 50);  // Cyan
             break;
-    case 6: colorWipe(ring.Color(0, 255, 255), 50); // Light Blue
+    case 6: colorWipe(ring.Color(0, 255, 0), 50);    // Green
             break;
+
+  
   }
 }
 
