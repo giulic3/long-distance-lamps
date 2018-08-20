@@ -19,15 +19,16 @@ LED_INVERT     = False   # True to invert the signal (when using NPN transistor 
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 # uSE GRB instead of RGB!
 
-LED_COLORS     = 7
-BUTTON_COLOR_PIN = 27
-BUTTON_POWER_PIN = 17
+LED_COLORS     = 7      # Number of possible led colors
+BUTTON_COLOR_PIN = 27   # GPIO connected to the touch button used to change leds color
+BUTTON_POWER_PIN = 17	# GPIO connected to the switch button used turn off the leds
+BUTTON_SEND_PIN = 22 	# GPIO connected to the touch button used to 'answer' to the sister lamp
 
 # Setup buttons GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUTTON_POWER_PIN, GPIO.IN)
 GPIO.setup(BUTTON_COLOR_PIN, GPIO.IN)
-
+GPIO.setup(BUTTON_SEND_PIN, GPIO.IN)
 
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
@@ -112,15 +113,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Init buttons states
-    buttonLedOldState = HIGH;
-    buttonPowerOldState = HIGH;
-    currentColor = 0;
+    buttonLedOldState = HIGH
+    buttonSendOldState = HIGH
+    buttonPowerOldState = HIGH
+    currentColor = 0
 
     # Create NeoPixel object with appropriate configuration.
     strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
     # Intialize the library (must be called once before other functions).
     strip.begin()
     strip.setBrightness(5)
+    strip.show()
     colorWipe(strip, Color(255,255,255))  # White
 
     print ('Press Ctrl-C to quit.')
@@ -133,11 +136,13 @@ if __name__ == '__main__':
             
             # Get current buttons state
             buttonLedNewState = GPIO.input(BUTTON_COLOR_PIN)
-            buttonPowerNewState = GPIO.input(BUTTON_POWER_PIN);
+	    buttonSendNewState = GPIO.input(BUTTON_SEND_PIN)
+            buttonPowerNewState = GPIO.input(BUTTON_POWER_PIN)
+	   
 
             # Color button logic
             # Check if state changed from high to low (button press).
-            if (buttonLedNewState == LOW and buttonLedOldState == HIGH):
+            if buttonLedNewState == LOW and buttonLedOldState == HIGH:
                 # Short delay to debounce button
                 time.sleep(0.05)
                 # Check if button is still low after debounce.
@@ -146,8 +151,16 @@ if __name__ == '__main__':
                     # Colors range from 0 to COLORS-1
                     currentColor = (currentColor+1) % LED_COLORS
                     showColor(strip, currentColor)
-        
-  
+
+	    # Send button logic
+	    if buttonSendNewState == LOW and buttonSendOldState == HIGH:
+	        time.sleep(0.05)
+		buttonSendNewState = GPIO.input(BUTTON_SEND_PIN)
+		if buttonSendNewState == LOW:
+		    # Tmp: increase brightness
+		    strip.setBrightness(100)
+	 	    strip.show()
+
             # Switch off button logic
             if buttonPowerNewState == LOW and buttonPowerOldState == HIGH:
                 time.sleep(0.05)
@@ -158,13 +171,10 @@ if __name__ == '__main__':
 
 
             # Set the last button state to the old state.
-            buttonLedOldState = buttonLedNewState;
-            buttonPowerOldState = buttonPowerNewState;
+            buttonLedOldState = buttonLedNewState
+	    buttonSendOldState = buttonSendNewState
+            buttonPowerOldState = buttonPowerNewState
 
-            # print ('Color wipe animations.')
-            
-            # colorWipe(strip, Color(255, 0, 0))  # Red wipe
-                
             #print ('Theater chase animations.')
             #theaterChase(strip, Color(127, 127, 127))  # White theater chase
             #theaterChase(strip, Color(127,   0,   0))  # Red theater chase
