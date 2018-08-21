@@ -5,10 +5,6 @@ from neopixel import *
 import argparse
 import RPi.GPIO as GPIO
 
-# Import Adafruit Blinka
-import board
-import digitalio
-
 # import Adafruit IO REST client.
 from Adafruit_IO import Client, Feed, RequestError
 
