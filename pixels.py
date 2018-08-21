@@ -1,3 +1,25 @@
+from enum import Enum
+
+# Enumeration class for led colors
+class LedColor(Enum):
+     WHITE      = 0
+     YELLOW     = 1
+     RED        = 2
+     PURPLE     = 3
+     BLUE       = 4
+     CYAN       = 5
+     GREEN      = 6
+# Maps enum colors to RGB colors as defined in the Neopixel library
+ledColorsDictionary = {
+    '0' : Color(255, 255, 255),
+    '1' : Color(129, 255, 0),
+    '2' : Color(0, 255, 0),
+    '3' : Color(0, 194, 255),
+    '4' : Color(0, 0, 255),
+    '5' : Color(255, 0, 255),
+    '6' : Color(255, 0, 0)
+}
+
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=50):
     """Wipe color across display a pixel at a time."""
@@ -57,17 +79,17 @@ def theaterChaseRainbow(strip, wait_ms=50):
 
 
 def showColor(strip, i):
-    if i == 0:
+    if i == LedColor.WHITE.value:
         colorWipe(strip, Color(255,255,255))    # White
-    elif i == 1:
+    elif i == LedColor.YELLOW.value:
         colorWipe(strip, Color(129, 255, 0))    # Yellow/Orange
-    elif i == 2:
-        colorWipe(strip, Color(0, 255, 0))        # Red
-    elif i == 3:
+    elif i == LedColor.RED.value:
+        colorWipe(strip, Color(0, 255, 0))      # Red
+    elif i == LedColor.PURPLE.value:
         colorWipe(strip, Color(0, 194, 255))    # Purple
-    elif i == 4:
-        colorWipe(strip, Color(0, 0, 255))        # Blue
-    elif i == 5:
+    elif i == LedColor.BLUE.value:
+        colorWipe(strip, Color(0, 0, 255))      # Blue
+    elif i == LedColor.CYAN.value:
         colorWipe(strip, Color(255, 0, 255))    # Cyan
     else:
-        colorWipe(strip, Color(255, 0, 0))        # Green
+        colorWipe(strip, Color(255, 0, 0))      # Green

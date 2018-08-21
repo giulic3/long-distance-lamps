@@ -10,6 +10,7 @@ from Adafruit_IO import Client, Feed, RequestError
 
 import pixels
 
+
 # Set to your Adafruit IO key.
 # Remember, your key is a secret,
 # so make sure not to publish it when you publish this code!
@@ -46,16 +47,34 @@ GPIO.setup(BUTTON_SEND_PIN, GPIO.IN)
 
 """ Function used to synchronize the color of the two lamps, after one has been modified """
 def syncColors(feed):
+    return
 
 """ Function used to 'answer' to a sister lamp that has changed the color,
 it sends an animation as a signal of communication received """
 def sendAnimation(feed):
+    return
+
+""" Function that triggers various animations on the pixels, signaling that the other lamp
+has 'answered'"""
+def showAnimations():
+    theaterChase(strip, Color(127, 127, 127))
+    theaterChase(strip, Color(127,   0,   0))
+    theaterChase(strip, Color(  0,   0, 127))
+    rainbow(strip)
+    rainbowCycle(strip)
+    theaterChaseRainbow(strip)
+
+""" Function that turns off all the leds using a colorWipe and reset currentColor"""
+def turnOffLeds():
+    return
+
 
 # TODO add lamp number as main argument
 # Main program logic follows:
 if __name__ == '__main__':
     # Process arguments
     parser = argparse.ArgumentParser()
+    parser.add_argument('lampid') # 1 or 2
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
     args = parser.parse_args()
 
@@ -94,6 +113,9 @@ if __name__ == '__main__':
     print ('Press Ctrl-C to quit.')
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
+    if not args.lampid:
+        print('You must specify the lamp id (1 or 2) to execute the program')
+        sys.exit()
 
     try:
 
@@ -118,16 +140,17 @@ if __name__ == '__main__':
                     aio.send(colorButtonFeed.key, currentColor)
                     # Avoid timeout from Adafruit IO
                     time.sleep(1)
+                    # Start 1h timer to turn off all the leds
+                    # TODO not sure, and this doesn't reset currentColor or brightness
+                    timer = Timer(30.0, colorWipe(strip, Color(0, 0, 0), 10))
+                    timer.start()
 
             # Send button logic
             if buttonSendNewState == LOW and buttonSendOldState == HIGH:
                 time.sleep(0.05)
                 buttonSendNewState = GPIO.input(BUTTON_SEND_PIN)
                 if buttonSendNewState == LOW:
-                    # TODO Tmp: increase brightness
-                    strip.setBrightness(50)
-                    strip.show()
-                    # TODO send animation to adafruit io
+                    aio.send(sendAnimationFeed.key, 1)
                     sendAnimation = 1
 
             # Switch off button logic
@@ -136,7 +159,8 @@ if __name__ == '__main__':
                 buttonPowerNewState = GPIO.input(BUTTON_POWER_PIN)
                 if buttonPowerNewState == LOW:
                     # Turn off all the leds
-                    colorWipe(strip, Color(0, 0, 0))
+                    colorWipe(strip, Color(0, 0, 0), 10)
+                    strip.setBrightness(5)
                     currentColor = -1
 
 
@@ -145,30 +169,35 @@ if __name__ == '__main__':
             buttonSendOldState = buttonSendNewState
             buttonPowerOldState = buttonPowerNewState
 
-            #theaterChase(strip, Color(127, 127, 127))  # White theater chase
-            #theaterChase(strip, Color(127,   0,   0))  # Red theater chase
-            #theaterChase(strip, Color(  0,   0, 127))  # Blue theater chase
-            #rainbow(strip)
-            #rainbowCycle(strip)
-            #theaterChaseRainbow(strip)
-
-            # Two-lamps communication logic TODO imo too many requests
+            # TODO Check requests rate
+            # TODO Two-lamps communication logic
             shouldSync = aio.receive(syncColorsFeed.key)
             if shouldSync.value == 1:
                 color1 = aio.receive(colorButtonFeed1.key) # check if correct!
                 color2 = aio.receive(colorButtonFeed2.key) #
                 # Update with the most recent color
                 if color1.updated_at <= color2.updated_at: # check
-                    # update with the color of 2
+                    # Update with the color of 2
+                    currentColor = color2.value
                 else:
-                    # update with the color of 1
+                    # Update with the color of 1
+                    currentColor = color1.value
+                # Update pixels and aio
+                colorWipe(strip, ledColorsDictionary[currentColor])
+                aio.send(colorButtonFeed1.key, currentColor)
+                aio.send(colorButtonFeed2.key, currentColor)
+                # Reset feed
+                aio.send(syncColorsFeed.key, 0)
 
             # Check if the sister lamp wants to send an animation
+            # TODO what happens if both lamps press the send button contemporarily?
             shouldReceiveAnimation = aio.receive(sendAnimationFeed.key)
             # Identify the receiving lamp
             if shouldReceiveAnimation.value == 1 and sendAnimation == 0:
-                # animate pixels TODO
                 # ...
+                showAnimations()
+                strip.setBrightness(30)
+                strip.show()
                 aio.send(sendAnimationFeed.key, 0)
 
             # Zero 'sendAnimation' variable for the sending lamp
