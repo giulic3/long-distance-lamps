@@ -8,6 +8,7 @@ from lamp_lib import Lamp
 from effects import *
 
 if __name__ == "__main__":
+
     try:
         # TODO add lamp number as main argument
         # Main program logic follows:
