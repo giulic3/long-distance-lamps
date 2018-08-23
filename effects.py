@@ -1,12 +1,16 @@
 # Define functions which animate LEDs in various ways.
-def colorWipe(strip, color, wait_ms=50):
+import time
+from neopixel import *
+
+
+def colorWipe(strip, color, wait_ms=20):
     """Wipe color across display a pixel at a time."""
     for i in range(strip.numPixels()):
         strip.setPixelColor(i, color)
         strip.show()
         time.sleep(wait_ms/1000.0)
 
-def theaterChase(strip, color, wait_ms=50, iterations=10):
+def theaterChase(strip, wait_ms=20, iterations=10):
     """Movie theater light style chaser animation."""
     for j in range(iterations):
         for q in range(3):
@@ -44,7 +48,7 @@ def rainbowCycle(strip, wait_ms=20, iterations=5):
         strip.show()
         time.sleep(wait_ms/1000.0)
 
-def theaterChaseRainbow(strip, wait_ms=50):
+def theaterChaseRainbow(strip, wait_ms=20):
     """Rainbow movie theater light style chaser animation."""
     for j in range(256):
         for q in range(3):
@@ -62,12 +66,12 @@ def showColor(strip, i):
     elif i == 1:
         colorWipe(strip, Color(129, 255, 0))    # Yellow/Orange
     elif i == 2:
-        colorWipe(strip, Color(0, 255, 0))        # Red
+        colorWipe(strip, Color(0, 255, 0))      # Red
     elif i == 3:
         colorWipe(strip, Color(0, 194, 255))    # Purple
     elif i == 4:
-        colorWipe(strip, Color(0, 0, 255))        # Blue
+        colorWipe(strip, Color(0, 0, 255))      # Blue
     elif i == 5:
         colorWipe(strip, Color(255, 0, 255))    # Cyan
     else:
-        colorWipe(strip, Color(255, 0, 0))        # Green
+        colorWipe(strip, Color(255, 0, 0))      # Green
