@@ -3,6 +3,7 @@ import RPi.GPIO as GPIO
 import time
 from neopixel import *
 from effects import *
+from subprocess import check_output
 
 class Lamp:
 
@@ -14,9 +15,6 @@ class Lamp:
     # Set to your Adafruit IO username.
     # (go to https://accounts.adafruit.com to find your username)
     ADAFRUIT_IO_USERNAME = ''
-
-    HIGH = 0
-    LOW = 1        # Button pressed
 
     # LED strip configuration:
     LED_COUNT      = 12      # Number of LED pixels.
@@ -39,9 +37,10 @@ class Lamp:
     currentColor = -1
 
     strip = None
-
+    hostname = None     
 
     def __init__ (self):
+
         # Setup buttons GPIO
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.BUTTON_POWER_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -72,8 +71,18 @@ class Lamp:
         # Set to true when the send button is pressed
         #sendAnimation = 0
 
+        # Retrieve Pi hostname to distinguish lamps
+        self.hostname =  check_output(["hostname"]).decode().strip("\ \n \t")
+        print(self.hostname)
         # Create NeoPixel object with appropriate configuration
-        self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL, self.LED_STRIP)
+        if self.hostname == "flash":
+            self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL, self.LED_STRIP)
+        elif self.hostname == "priscilla": 
+            self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL)
+        else:
+            print("Invalid hostname!")
+            exit(1)
+
         # Intialize the neopixel library (must be called once before other functions)
         self.strip.begin()
         self.strip.setBrightness(5)
