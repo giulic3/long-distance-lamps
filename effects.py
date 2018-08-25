@@ -83,7 +83,6 @@ def theaterChaseRainbow(strip, wait_ms=20):
 
 
 def showColor(strip, i):
-
     colorWipe(strip, ledColorsDictionary[str(i)])
     """
     if i == LedColor.WHITE.value:

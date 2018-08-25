@@ -5,6 +5,7 @@ import threading
 from neopixel import *
 from effects import *
 from subprocess import check_output
+import signal
 
 class Lamp:
 
@@ -44,8 +45,11 @@ class Lamp:
     
     aio = None
     colorButtonFeed = None
+    # Wait 'timeoutSend' seconds after choosing the color before sending to aio
+    timeoutSend = 5
+    changingColor = False
 
-    def __init__ (self):
+    def __init__ (self, aio_username, aio_key):
 
         # Setup buttons GPIO
         GPIO.setmode(GPIO.BCM)
@@ -58,7 +62,8 @@ class Lamp:
 
         # Initialize Adafruit IO
         # Create an instance of the REST client
-    
+        self.ADAFRUIT_IO_USERNAME =  aio_username
+        self.ADAFRUIT_IO_KEY = aio_key
         self.aio = Client(self.ADAFRUIT_IO_USERNAME, self.ADAFRUIT_IO_KEY)
 
         # Initialize feeds
@@ -73,6 +78,8 @@ class Lamp:
 
         # Set to true when the send button is pressed
         #sendAnimation = 0
+
+        signal.signal(signal.SIGALRM, self.sendColorTimeoutHandler)
 
         self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
         self.colorUpdateTimestamp += 'Z'
@@ -94,15 +101,28 @@ class Lamp:
         self.strip.setBrightness(5)
         # Leds are turned off at the beginning
 
+    def sendColorTimeoutHandler(self,signum, frame):
+        self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
+        self.colorUpdateTimestamp += 'Z'
+        self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        print("Color sent")
+        self.changingColor = False
+
     def buttonLedCallback(self, channel):
         print("Led Pressed")
+        self.changingColor = True
         # Colors range from 0 to COLORS-1
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
         print(self.currentColor)
         showColor(self.strip, self.currentColor)
+
+        # Send signal timer
+        signal.alarm(self.timeoutSend)
+        """
         self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
         self.colorUpdateTimestamp += 'Z'
         self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        """
 
     def buttonPowerCallback(self, channel):
         print("Power Pressed")
@@ -119,18 +139,19 @@ class Lamp:
 
     """ Function used to synchronize the color of the two lamps, after one has been modified """
     def syncColors(self):
-        colorButtonData = self.aio.receive(self.colorButtonFeed.key)
-        print(colorButtonData.updated_at)
-        # If the online value is more recent than local
-        if colorButtonData.updated_at >= self.colorUpdateTimestamp:
-            self.currentColor = int(colorButtonData.value)
-            showColor(self.strip, self.currentColor)
-            # Update local timestamp
-            self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-            self.colorUpdateTimestamp += 'Z'
-            # Update global timestamp
-            self.aio.send(self.colorButtonFeed.key, self.currentColor)
-        
+        if not self.changingColor:
+            colorButtonData = self.aio.receive(self.colorButtonFeed.key)
+            print(colorButtonData.updated_at)
+            # If the online value is more recent than local
+            if colorButtonData.updated_at >= self.colorUpdateTimestamp:
+                self.currentColor = int(colorButtonData.value)
+                showColor(self.strip, self.currentColor)
+                # Update local timestamp
+                self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
+                self.colorUpdateTimestamp += 'Z'
+                # Update global timestamp
+                self.aio.send(self.colorButtonFeed.key, self.currentColor)
+            
         # 10 seconds timer
         threading.Timer(10, self.syncColors).start()
 
