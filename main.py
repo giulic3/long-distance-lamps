@@ -10,7 +10,6 @@ from effects import *
 if __name__ == "__main__":
 
     try:
-        # TODO add lamp number as main argument
         # Main program logic follows:
         # Process arguments
         parser = argparse.ArgumentParser()
@@ -22,6 +21,7 @@ if __name__ == "__main__":
             print('Use "-c" argument to clear LEDs on exit')
 
         lamp = Lamp()
+        lamp.syncColors()
 
         while True:
             time.sleep(1)

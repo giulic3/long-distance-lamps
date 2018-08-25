@@ -1,6 +1,7 @@
-#from Adafruit_IO import Client, Feed, RequestError
+from Adafruit_IO import Client, Feed, RequestError
 import RPi.GPIO as GPIO
-import time
+import time, datetime
+import threading
 from neopixel import *
 from effects import *
 from subprocess import check_output
@@ -35,9 +36,14 @@ class Lamp:
     BUTTON_SEND_PIN = 22     # GPIO connected to the touch button used to 'answer' to the sister lamp
 
     currentColor = -1
+    # UTC Timezone in ISO-8601 format "YYYY-MM-DDTHH:MM:SSZ"
+    colorUpdateTimestamp = ''
 
     strip = None
     hostname = None     
+    
+    aio = None
+    colorButtonFeed = None
 
     def __init__ (self):
 
@@ -52,24 +58,24 @@ class Lamp:
 
         # Initialize Adafruit IO
         # Create an instance of the REST client
-        """
-        aio = Client(ADAFRUIT_IO_USERNAME, ADAFRUIT_IO_KEY)
+    
+        self.aio = Client(self.ADAFRUIT_IO_USERNAME, self.ADAFRUIT_IO_KEY)
 
         # Initialize feeds
     	# Read from existing feeds
 
-        colorButtonFeed1 = aio.feeds('long-distance-lamps.colorbutton1')
-        colorButtonFeed2 = aio.feeds('long-distance-lamps.colorbutton2')
+        self.colorButtonFeed = self.aio.feeds('long-distance-lamps.colorbutton')
+        """
         sendButtonFeed1 = aio.feeds('long-distance-lamps.sendbutton1')
         sendButtonFeed2 = aio.feeds('long-distance-lamps.sendbutton2')
-        ledsFeed1 = aio.feeds('long-distance-lamps.leds1')
-        ledsFeed2 = aio.feeds('long-distance-lamps.leds2')
-        syncColorsFeed = aio.feeds('long-distance-lamps.synccolors')
         sendAnimationFeed = aio.feeds('long-distance-lamps.sendanimation')
         """
 
         # Set to true when the send button is pressed
         #sendAnimation = 0
+
+        self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
+        self.colorUpdateTimestamp += 'Z'
 
         # Retrieve Pi hostname to distinguish lamps
         self.hostname =  check_output(["hostname"]).decode().strip("\ \n \t")
@@ -87,7 +93,6 @@ class Lamp:
         self.strip.begin()
         self.strip.setBrightness(5)
         # Leds are turned off at the beginning
-        # colorWipe(strip, Color(255,255,255))  # White
 
     def buttonLedCallback(self, channel):
         print("Led Pressed")
@@ -95,7 +100,9 @@ class Lamp:
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
         print(self.currentColor)
         showColor(self.strip, self.currentColor)
-        # aio.send(colorButtonFeed.key, currentColor)
+        self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
+        self.colorUpdateTimestamp += 'Z'
+        self.aio.send(self.colorButtonFeed.key, self.currentColor)
 
     def buttonPowerCallback(self, channel):
         print("Power Pressed")
@@ -111,12 +118,25 @@ class Lamp:
 
 
     """ Function used to synchronize the color of the two lamps, after one has been modified """
-    def syncColors(feed):
-        return
+    def syncColors(self):
+        colorButtonData = self.aio.receive(self.colorButtonFeed.key)
+        print(colorButtonData.updated_at)
+        # If the online value is more recent than local
+        if colorButtonData.updated_at >= self.colorUpdateTimestamp:
+            self.currentColor = int(colorButtonData.value)
+            showColor(self.strip, self.currentColor)
+            # Update local timestamp
+            self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
+            self.colorUpdateTimestamp += 'Z'
+            # Update global timestamp
+            self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        
+        # 10 seconds timer
+        threading.Timer(10, self.syncColors).start()
 
     """ Function used to 'answer' to a sister lamp that has changed the color,
     it sends an animation as a signal of communication received """
-    def sendAnimation(feed):
+    def sendAnimation(self):
         return
 
         #theaterChase(strip, Color(127, 127, 127))  # White theater chase
@@ -126,17 +146,6 @@ class Lamp:
         #rainbowCycle(strip)
         #theaterChaseRainbow(strip)
         """
-        # Two-lamps communication logic TODO imo too many requests
-        shouldSync = aio.receive(syncColorsFeed.key)
-        if shouldSync.value == 1:
-            color1 = aio.receive(colorButtonFeed1.key) # check if correct!
-            color2 = aio.receive(colorButtonFeed2.key) #
-            # Update with the most recent color
-            if color1.updated_at <= color2.updated_at: # check
-                # update with the color of 2
-            else:
-                # update with the color of 1
-
         # Check if the sister lamp wants to send an animation
         shouldReceiveAnimation = aio.receive(sendAnimationFeed.key)
         # Identify the receiving lamp
