@@ -1,11 +1,13 @@
 from Adafruit_IO import Client, Feed, RequestError
 import RPi.GPIO as GPIO
-import time, datetime
+import time
+import datetime
 import threading
 from neopixel import *
 from effects import *
 from subprocess import check_output
 import signal
+
 
 class Lamp:
 
@@ -40,14 +42,19 @@ class Lamp:
     # UTC Timezone in ISO-8601 format "YYYY-MM-DDTHH:MM:SSZ"
     colorUpdateTimestamp = ''
 
+    powerButtonPressTimestamp = ''
+
     strip = None
-    hostname = None     
-    
+    hostname = None
+
     aio = None
     colorButtonFeed = None
     # Wait 'timeoutSend' seconds after choosing the color before sending to aio
     timeoutSend = 5
+    # 'True' if the user is in the middle of changing the leds color
     changingColor = False
+    # 'True' to indicate that a thread must exit
+    exit = False
 
     def __init__ (self, aio_username, aio_key):
 
@@ -68,13 +75,7 @@ class Lamp:
 
         # Initialize feeds
     	# Read from existing feeds
-
         self.colorButtonFeed = self.aio.feeds('long-distance-lamps.colorbutton')
-        """
-        sendButtonFeed1 = aio.feeds('long-distance-lamps.sendbutton1')
-        sendButtonFeed2 = aio.feeds('long-distance-lamps.sendbutton2')
-        sendAnimationFeed = aio.feeds('long-distance-lamps.sendanimation')
-        """
 
         # Set to true when the send button is pressed
         #sendAnimation = 0
@@ -90,21 +91,22 @@ class Lamp:
         # Create NeoPixel object with appropriate configuration
         if self.hostname == "flash":
             self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL, self.LED_STRIP)
-        elif self.hostname == "priscilla": 
+        elif self.hostname == "priscilla":
             self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL)
         else:
             print("Invalid hostname!")
             exit(1)
 
-        # Intialize the neopixel library (must be called once before other functions)
+        # Intialize the NeoPixel library (must be called once before other functions)
         self.strip.begin()
         self.strip.setBrightness(5)
         # Leds are turned off at the beginning
 
+        threading.Thread(target=self.syncColors).start()
+
     def sendColorTimeoutHandler(self,signum, frame):
-        self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-        self.colorUpdateTimestamp += 'Z'
         self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
         print("Color sent")
         self.changingColor = False
 
@@ -118,16 +120,13 @@ class Lamp:
 
         # Send signal timer
         signal.alarm(self.timeoutSend)
-        """
-        self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-        self.colorUpdateTimestamp += 'Z'
-        self.aio.send(self.colorButtonFeed.key, self.currentColor)
-        """
 
     def buttonPowerCallback(self, channel):
         print("Power Pressed")
         colorWipe(self.strip, Color(0, 0, 0))
         self.currentColor = -1
+        colorButtonData = self.aio.receive(self.colorButtonFeed.key)
+        self.powerButtonPressTimestamp = colorButtonData.updated_at
 
     def buttonSendCallback(self, channel):
         print("Send Pressed")
@@ -136,24 +135,22 @@ class Lamp:
         # TODO send animation to adafruit io
         #sendAnimation = 1
 
-
     """ Function used to synchronize the color of the two lamps, after one has been modified """
     def syncColors(self):
-        if not self.changingColor:
-            colorButtonData = self.aio.receive(self.colorButtonFeed.key)
-            print(colorButtonData.updated_at)
-            # If the online value is more recent than local
-            if colorButtonData.updated_at >= self.colorUpdateTimestamp:
-                self.currentColor = int(colorButtonData.value)
-                showColor(self.strip, self.currentColor)
-                # Update local timestamp
-                self.colorUpdateTimestamp = datetime.datetime.utcnow().replace(microsecond=0).isoformat()
-                self.colorUpdateTimestamp += 'Z'
-                # Update global timestamp
-                self.aio.send(self.colorButtonFeed.key, self.currentColor)
-            
-        # 10 seconds timer
-        threading.Timer(10, self.syncColors).start()
+        while not self.exit:
+            if (not self.changingColor):
+                colorButtonData = self.aio.receive(self.colorButtonFeed.key)
+                print(colorButtonData.updated_at)
+                # If the online value is more recent than local
+                if colorButtonData.updated_at > self.colorUpdateTimestamp:
+                    self.currentColor = int(colorButtonData.value)
+                    showColor(self.strip, self.currentColor)
+                    # Update global timestamp
+                    #self.aio.send(self.colorButtonFeed.key, self.currentColor)
+                self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
+
+            # 10 seconds timer
+            time.sleep(10)
 
     """ Function used to 'answer' to a sister lamp that has changed the color,
     it sends an animation as a signal of communication received """

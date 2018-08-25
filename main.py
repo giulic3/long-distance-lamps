@@ -21,14 +21,13 @@ if __name__ == "__main__":
         print ('Press Ctrl-C to quit.')
         if not args.clear:
             print('Use "-c" argument to clear LEDs on exit')
-        
+
         if args.config_file:
             with open(args.config_file, 'r') as f:
                 config_data = json.load(f)
-        
+
         lamp = Lamp(config_data['connection']['aio_username'],
                 config_data['connection']['aio_key'])
-        lamp.syncColors()
 
         while True:
             time.sleep(1)
@@ -36,3 +35,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if args.clear:
             colorWipe(lamp.strip, Color(0,0,0), 10)
+            lamp.exit = True

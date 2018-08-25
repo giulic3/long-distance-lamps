@@ -23,8 +23,6 @@ ledColorsDictionary = {
 }
 
 # Define functions which animate LEDs in various ways.
-
-
 def colorWipe(strip, color, wait_ms=20):
     """Wipe color across display a pixel at a time."""
     for i in range(strip.numPixels()):
@@ -83,20 +81,5 @@ def theaterChaseRainbow(strip, wait_ms=20):
 
 
 def showColor(strip, i):
-    colorWipe(strip, ledColorsDictionary[str(i)])
-    """
-    if i == LedColor.WHITE.value:
-        colorWipe(strip, Color(255,255,255))    # White
-    elif i == LedColor.YELLOW.value:
-        colorWipe(strip, Color(129, 255, 0))    # Yellow/Orange
-    elif i == LedColor.RED.value:
-        colorWipe(strip, Color(0, 255, 0))      # Red
-    elif i == LedColor.PURPLE.value:
-        colorWipe(strip, Color(0, 194, 255))    # Purple
-    elif i == LedColor.BLUE.value:
-        colorWipe(strip, Color(0, 0, 255))      # Blue
-    elif i == LedColor.CYAN.value:
-        colorWipe(strip, Color(255, 0, 255))    # Cyan
-    else:
-        colorWipe(strip, Color(255, 0, 0))      # Green
-    """
+    if i > -1:
+        colorWipe(strip, ledColorsDictionary[str(i)])
