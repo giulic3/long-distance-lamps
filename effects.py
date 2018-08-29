@@ -15,11 +15,15 @@ class LedColor(Enum):
 ledColorsDictionary = {
     '0' : Color(255, 255, 255),
     '1' : Color(129, 255, 0),
-    '2' : Color(0, 255, 0),
+    '2' : Color(0, 63, 0),
     '3' : Color(0, 194, 255),
     '4' : Color(0, 0, 255),
     '5' : Color(255, 0, 255),
     '6' : Color(255, 0, 0)
+}
+
+animationsDictionary = {
+
 }
 
 # Define functions which animate LEDs in various ways.
@@ -30,7 +34,7 @@ def colorWipe(strip, color, wait_ms=20):
         strip.show()
         time.sleep(wait_ms/1000.0)
 
-def theaterChase(strip, wait_ms=20, iterations=10):
+def theaterChase(strip, color, wait_ms=20, iterations=10):
     """Movie theater light style chaser animation."""
     for j in range(iterations):
         for q in range(3):
@@ -52,6 +56,7 @@ def wheel(pos):
         pos -= 170
         return Color(0, pos * 3, 255 - pos * 3)
 
+
 def rainbow(strip, wait_ms=20, iterations=1):
     """Draw rainbow that fades across all pixels at once."""
     for j in range(256*iterations):
@@ -59,6 +64,17 @@ def rainbow(strip, wait_ms=20, iterations=1):
             strip.setPixelColor(i, wheel((i+j) & 255))
         strip.show()
         time.sleep(wait_ms/1000.0)
+
+
+def greenRainbow(strip, wait_ms=20, iterations=1):
+    for j in range(256*iterations):
+        for i in range(strip.numPixels()):
+            strip.setPixelColor(i, greenWheel((i+j) & 255))
+        strip.show()
+        time.sleep(wait_ms/1000.0)
+
+#def greenWheel(pos):
+
 
 def rainbowCycle(strip, wait_ms=20, iterations=5):
     """Draw rainbow that uniformly distributes itself across all pixels."""
@@ -83,3 +99,77 @@ def theaterChaseRainbow(strip, wait_ms=20):
 def showColor(strip, i):
     if i > -1:
         colorWipe(strip, ledColorsDictionary[str(i)])
+
+
+def clock(strip, color=2, wait_ms=20):
+    #colorIndex = list(ledColorsDictionary.keys())[list(ledColorsDictionary.values()).index(color)]
+    #showColor(strip, colorIndex)
+    showColor(strip, 2) # Red
+    while True:
+        for k in range(strip.numPixels()):
+            start = 0
+            end = k
+            for i in range(strip.numPixels()):
+                for j in range(0, start, 1):
+                    strip.setPixelColor(j, Color(0, 63, 0))
+                for j in range(start, end, 1):
+                    strip.setPixelColor(j, Color(0, 255, 0))
+                for j in range(end, strip.numPixels(), 1):
+                    strip.setPixelColor(j, Color(0, 63, 0))
+                strip.show()
+                time.sleep(wait_ms/600.0)
+                start += 1
+                end += 1
+
+def four(strip, wait_ms=20):
+    showColor(strip, 2)
+    i = 0
+    while True:
+        for j in range(strip.numPixels()):
+            strip.setPixelColor(j, Color(0, 20, 0))
+        strip.setPixelColor(i % 12, Color(0, 255, 0))
+        strip.setPixelColor((i + 1) % 12, Color(0, 255, 0))
+        strip.setPixelColor((i + 2) % 12, Color(0, 255, 0))
+        strip.setPixelColor((i + 3) % 12, Color(0, 255, 0))
+
+        strip.show()
+        time.sleep(wait_ms/1000.0)
+        i += 1
+
+
+"""
+def clock(strip, color=2, wait_ms=20):
+    #colorIndex = list(ledColorsDictionary.keys())[list(ledColorsDictionary.values()).index(color)]
+    #showColor(strip, colorIndex)
+    showColor(strip, 2) # Red
+    for k in range(strip.numPixels()):
+        start = 0
+        end = k
+        for i in range(strip.numPixels()):
+            if start <= end:
+                for j in range(0, start, 1):
+                    strip.setPixelColor(j, Color(0, 0, 0))
+                for j in range(start, end, 1):
+                    strip.setPixelColor(j, Color(0, 255, 0))
+                for j in range(end, strip.numPixels(), 1):
+                    strip.setPixelColor(j, Color(0, 0, 0))
+            else:
+                for j in range(0, end, 1):
+                    strip.setPixelColor(j, Color(0, 255, 0))
+                for j in range(end, start, 1):
+                    strip.setPixelColor(j, Color(0, 0, 0))
+                for j in range(start, strip.numPixels(), 1):
+                    strip.setPixelColor(j, Color(0, 255, 0))
+            strip.show()
+            time.sleep(wait_ms/100.0)
+            start = (start + 1) % strip.numPixels()
+            end += (end + 1) % strip.numPixels()
+"""
+
+def mermaid(strip):
+    for i in range(100):
+        colorWipe(self.strip, Color(0, 127, 0))
+        colorWipe(self.strip, Color(0, 0, 0), 10)
+        colorWipe(self.strip, Color(0, 127, 0))
+        colorWipe(self.strip, Color(0, 0, 0), 10)
+        time.sleep(0.5)
