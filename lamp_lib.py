@@ -56,9 +56,10 @@ class Lamp:
     # 'True' to indicate that a thread must exit
     exit = False
 
-    def __init__ (self, aio_username, aio_key):
+    def __init__ (self, aio_username, aio_key, debug=False):
 
         # Setup buttons GPIO
+        print("Lamp: setting up gpio")
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.BUTTON_POWER_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.BUTTON_COLOR_PIN, GPIO.IN)
@@ -66,9 +67,11 @@ class Lamp:
         GPIO.add_event_detect(self.BUTTON_COLOR_PIN, GPIO.FALLING, callback=self.buttonLedCallback, bouncetime=200)
         GPIO.add_event_detect(self.BUTTON_POWER_PIN, GPIO.FALLING, callback=self.buttonPowerCallback, bouncetime=200)
         GPIO.add_event_detect(self.BUTTON_SEND_PIN, GPIO.FALLING, callback=self.buttonSendCallback, bouncetime=200)
+        #TODO : gpio per il pulsante di spegnimento del raspberry
 
         # Initialize Adafruit IO
         # Create an instance of the REST client
+        print("Lamp: initiating adafruit connection")
         self.ADAFRUIT_IO_USERNAME =  aio_username
         self.ADAFRUIT_IO_KEY = aio_key
         self.aio = Client(self.ADAFRUIT_IO_USERNAME, self.ADAFRUIT_IO_KEY)
@@ -87,7 +90,7 @@ class Lamp:
 
         # Retrieve Pi hostname to distinguish lamps
         self.hostname =  check_output(["hostname"]).decode().strip("\ \n \t")
-        print(self.hostname)
+        print("Lamp: hostname = ", self.hostname)
         # Create NeoPixel object with appropriate configuration
         if self.hostname == "flash":
             self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL, self.LED_STRIP)
@@ -103,34 +106,47 @@ class Lamp:
         # Leds are turned off at the beginning
 
         threading.Thread(target=self.syncColors).start()
+        print('Lamp: Ready\n \
+            d         b\n \
+           d           b\n \
+          d             b\n \
+         d               b\n \
+        d     BradiPi     b\n \
+         """:::.....:::"""\n \
+                fff\n \
+              ."   ".\n \
+             ^       ^."--.\n \
+             b       d     ,\n \
+              zzzzzzz       ..oOo\n \
+        ')
 
     def sendColorTimeoutHandler(self,signum, frame):
         self.aio.send(self.colorButtonFeed.key, self.currentColor)
         self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-        print("Color sent")
+        print("Lamp: Timeout reached. Color sent. Timestamp: " , self.colorUpdateTimestamp)
         self.changingColor = False
 
     def buttonLedCallback(self, channel):
-        print("Led Pressed")
+        print("Lamp: Led button Pressed")
         self.changingColor = True
         # Colors range from 0 to COLORS-1
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
-        print(self.currentColor)
+        print("current color", self.currentColor)
         showColor(self.strip, self.currentColor)
 
         # Send signal timer
         signal.alarm(self.timeoutSend)
 
     def buttonPowerCallback(self, channel):
-        print("Power Pressed")
+        print("Lamp: Power button Pressed")
         colorWipe(self.strip, Color(0, 0, 0))
         self.currentColor = -1
         colorButtonData = self.aio.receive(self.colorButtonFeed.key)
         self.powerButtonPressTimestamp = colorButtonData.updated_at
 
     def buttonSendCallback(self, channel):
-        print("Send Pressed")
-        self.strip.setBrightness(50)
+        print("Lamp: Send button Pressed")
+        #self.strip.setBrightness(50)
         self.strip.show()
         # TODO send animation to adafruit io
         #sendAnimation = 1
@@ -140,11 +156,12 @@ class Lamp:
         while not self.exit:
             if (not self.changingColor):
                 colorButtonData = self.aio.receive(self.colorButtonFeed.key)
-                print(colorButtonData.updated_at)
+                #print(colorButtonData.updated_at)
                 # If the online value is more recent than local
                 if colorButtonData.updated_at > self.colorUpdateTimestamp:
                     self.currentColor = int(colorButtonData.value)
                     showColor(self.strip, self.currentColor)
+                    print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
                     # Update global timestamp
                     #self.aio.send(self.colorButtonFeed.key, self.currentColor)
                 self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at

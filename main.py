@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Long distance lamps
+print("loading components...")
 import time
 from neopixel import *
 import argparse
@@ -24,7 +25,12 @@ if __name__ == "__main__":
 
         if args.config_file:
             with open(args.config_file, 'r') as f:
+                print("reading config file")
                 config_data = json.load(f)
+        else:
+            print("no configuration file given, please provide one")
+
+        print("creating the lamp")
 
         lamp = Lamp(config_data['connection']['aio_username'],
                 config_data['connection']['aio_key'])
@@ -35,4 +41,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         if args.clear:
             colorWipe(lamp.strip, Color(0,0,0), 10)
+            print("closing, please wait...")
             lamp.exit = True
