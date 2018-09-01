@@ -40,6 +40,6 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         if args.clear:
-            colorWipe(lamp.strip, Color(0,0,0), 10)
+            lamp.clear()
             print("closing, please wait...")
             lamp.exit = True

@@ -105,7 +105,10 @@ class Lamp:
         self.strip.setBrightness(150)
         # Leds are turned off at the beginning
 
+        self.clear()
+
         threading.Thread(target=self.syncColors).start()
+
         print('Lamp: Ready\n \
             d         b\n \
            d           b\n \
@@ -167,3 +170,5 @@ class Lamp:
 
             # 10 seconds timer
             time.sleep(10)
+    def clear (self):
+        colorWipe(self.strip, Color(0, 0, 0))
