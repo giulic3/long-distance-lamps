@@ -137,8 +137,8 @@ def four(strip, wait_ms=20):
         i += 1
 
 
-"""
-def clock(strip, color=2, wait_ms=20):
+
+def clock2(strip, color=2, wait_ms=20):
     #colorIndex = list(ledColorsDictionary.keys())[list(ledColorsDictionary.values()).index(color)]
     #showColor(strip, colorIndex)
     showColor(strip, 2) # Red
@@ -164,7 +164,7 @@ def clock(strip, color=2, wait_ms=20):
             time.sleep(wait_ms/100.0)
             start = (start + 1) % strip.numPixels()
             end += (end + 1) % strip.numPixels()
-"""
+
 
 def mermaid(strip):
     for i in range(100):
