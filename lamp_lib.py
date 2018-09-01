@@ -102,7 +102,7 @@ class Lamp:
 
         # Intialize the NeoPixel library (must be called once before other functions)
         self.strip.begin()
-        self.strip.setBrightness(5)
+        self.strip.setBrightness(150)
         # Leds are turned off at the beginning
 
         threading.Thread(target=self.syncColors).start()
@@ -147,7 +147,6 @@ class Lamp:
     def buttonSendCallback(self, channel):
         print("Lamp: Send button Pressed")
         #self.strip.setBrightness(50)
-        self.strip.show()
         # TODO send animation to adafruit io
         #sendAnimation = 1
 
@@ -168,28 +167,3 @@ class Lamp:
 
             # 10 seconds timer
             time.sleep(10)
-
-    """ Function used to 'answer' to a sister lamp that has changed the color,
-    it sends an animation as a signal of communication received """
-    def sendAnimation(self):
-        return
-
-        #theaterChase(strip, Color(127, 127, 127))  # White theater chase
-        #theaterChase(strip, Color(127,   0,   0))  # Red theater chase
-        #theaterChase(strip, Color(  0,   0, 127))  # Blue theater chase
-        #rainbow(strip)
-        #rainbowCycle(strip)
-        #theaterChaseRainbow(strip)
-        """
-        # Check if the sister lamp wants to send an animation
-        shouldReceiveAnimation = aio.receive(sendAnimationFeed.key)
-        # Identify the receiving lamp
-        if shouldReceiveAnimation.value == 1 and sendAnimation == 0:
-            # animate pixels TODO
-            # ...
-            aio.send(sendAnimationFeed.key, 0)
-
-        # Zero 'sendAnimation' variable for the sending lamp
-        elif shouldReceiveAnimatin.value == 0 and sendAnimation == 1:
-            sendAnimation = 0
-        """
