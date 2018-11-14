@@ -8,6 +8,15 @@ from effects import *
 from subprocess import check_output
 import signal
 
+def atomicConnection(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            func(self, *args,**kwargs)            
+            #print("normal execution")
+        except:
+            print("AN ERROR OCCURRED!!!!")
+            self.rollback()
+    return wrapper
 
 class Lamp:
 
@@ -56,6 +65,12 @@ class Lamp:
     # 'True' to indicate that a thread must exit
     exit = False
 
+    lastSavedState = None
+
+    bootstrap = True
+
+    BOUNCE_TIME = 200
+
     def __init__ (self, aio_username, aio_key, debug=False):
 
         # Setup buttons GPIO
@@ -64,9 +79,9 @@ class Lamp:
         GPIO.setup(self.BUTTON_POWER_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.BUTTON_COLOR_PIN, GPIO.IN)
         GPIO.setup(self.BUTTON_SEND_PIN, GPIO.IN)
-        GPIO.add_event_detect(self.BUTTON_COLOR_PIN, GPIO.FALLING, callback=self.buttonLedCallback, bouncetime=200)
-        GPIO.add_event_detect(self.BUTTON_POWER_PIN, GPIO.FALLING, callback=self.buttonPowerCallback, bouncetime=200)
-        GPIO.add_event_detect(self.BUTTON_SEND_PIN, GPIO.FALLING, callback=self.buttonSendCallback, bouncetime=200)
+        GPIO.add_event_detect(self.BUTTON_COLOR_PIN, GPIO.FALLING, callback=self.buttonLedCallback, bouncetime=self.BOUNCE_TIME)
+        GPIO.add_event_detect(self.BUTTON_POWER_PIN, GPIO.FALLING, callback=self.buttonPowerCallback, bouncetime=self.BOUNCE_TIME)
+        GPIO.add_event_detect(self.BUTTON_SEND_PIN, GPIO.FALLING, callback=self.buttonSendCallback, bouncetime=self.BOUNCE_TIME)
         #TODO : gpio per il pulsante di spegnimento del raspberry
 
         # Initialize Adafruit IO
@@ -123,10 +138,20 @@ class Lamp:
               zzzzzzz       ..oOo\n \
         ')
 
+    def rollback(self):
+        print("Rolling back to last known state....")
+        if self.lastSavedState is not None:
+            showColor(self.strip, int(self.lastSavedState.value))
+            self.colorUpdateTimestamp = self.lastSavedState.updated_at
+        self.changingColor = False
+
+    @atomicConnection
     def sendColorTimeoutHandler(self,signum, frame):
+        print("Lamp: Timeout reached. Sending Color....")
         self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        time.sleep(2)
         self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-        print("Lamp: Timeout reached. Color sent. Timestamp: " , self.colorUpdateTimestamp)
+        print("Lamp: Color sent. Timestamp: " , self.colorUpdateTimestamp)
         self.changingColor = False
 
     def buttonLedCallback(self, channel):
@@ -136,10 +161,10 @@ class Lamp:
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
         print("current color", self.currentColor)
         showColor(self.strip, self.currentColor)
-
         # Send signal timer
         signal.alarm(self.timeoutSend)
 
+    @atomicConnection
     def buttonPowerCallback(self, channel):
         print("Lamp: Power button Pressed")
         colorWipe(self.strip, Color(0, 0, 0))
@@ -153,22 +178,33 @@ class Lamp:
         # TODO send animation to adafruit io
         #sendAnimation = 1
 
-    """ Function used to synchronize the color of the two lamps, after one has been modified """
+    @atomicConnection
+    def doSyncColor(self):
+        print("syncing color")
+        colorButtonData = self.aio.receive(self.colorButtonFeed.key)
+        self.lastSavedState = colorButtonData
+        #print(colorButtonData.updated_at)
+        # If the online value is more recent than local
+        if colorButtonData.updated_at > self.colorUpdateTimestamp or self.bootstrap:
+            if self.bootstrap:
+                self.bootstrap = False
+            self.currentColor = int(colorButtonData.value)
+            showColor(self.strip, self.currentColor)
+            print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
+            # Update global timestamp
+            #self.aio.send(self.colorButtonFeed.key, self.currentColor)
+        self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
+        print("updating colors")
+        print(colorButtonData)
+        #print("curent update time", self.colorUpdateTimestamp )
+
     def syncColors(self):
+        """ Function used to synchronize the color of the two lamps, after one has been modified """
         while not self.exit:
             if (not self.changingColor):
-                colorButtonData = self.aio.receive(self.colorButtonFeed.key)
-                #print(colorButtonData.updated_at)
-                # If the online value is more recent than local
-                if colorButtonData.updated_at > self.colorUpdateTimestamp:
-                    self.currentColor = int(colorButtonData.value)
-                    showColor(self.strip, self.currentColor)
-                    print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
-                    # Update global timestamp
-                    #self.aio.send(self.colorButtonFeed.key, self.currentColor)
-                self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-
+                self.doSyncColor()
             # 10 seconds timer
             time.sleep(10)
+
     def clear (self):
         colorWipe(self.strip, Color(0, 0, 0))
