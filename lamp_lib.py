@@ -147,7 +147,7 @@ class Lamp:
     def newColorReceived(self):
         print("pulsing...")
         timeout = 10
-        while (not self.stopPulse) or timeout == 0:
+        while (not self.stopPulse) and timeout >= 0:
             pulse(self.strip, int(self.currentColor), self.LED_BRIGHTNESS)
             timeout -= 1
         self.stopPulse = True
