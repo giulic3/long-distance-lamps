@@ -7,14 +7,16 @@ from neopixel import *
 from effects import *
 from subprocess import check_output
 import signal
+import traceback
 
 def atomicConnection(func):
     def wrapper(self, *args, **kwargs):
         try:
             func(self, *args,**kwargs)            
             #print("normal execution")
-        except:
+        except Exception:
             print("AN ERROR OCCURRED!!!!")
+            traceback.print_exc()
             self.rollback()
     return wrapper
 
