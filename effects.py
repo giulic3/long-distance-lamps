@@ -22,6 +22,26 @@ ledColorsDictionary = {
     '6' : Color(255, 0, 0)
 }
 
+def pulse(strip, color, defBrightness, wait_ms=40):
+    step = int((255 - 20) / 40)
+    #brighter
+    for i in range(defBrightness, 254, step):
+        strip.setBrightness(i)
+        strip.show()
+        time.sleep(wait_ms/1000)
+    time.sleep(1)
+    #darker
+    for i in range(254, 20, -1 * step):
+        strip.setBrightness(i)
+        strip.show()
+        time.sleep(wait_ms/1000)
+    #back to default
+    for i in range(20, defBrightness, step):
+        strip.setBrightness(i)
+        strip.show()
+        time.sleep(wait_ms/1000)
+
+
 # Define functions which animate LEDs in various ways.
 def colorWipe(strip, color, wait_ms=20):
     """Wipe color across display a pixel at a time."""

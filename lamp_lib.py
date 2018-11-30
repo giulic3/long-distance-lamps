@@ -35,7 +35,7 @@ class Lamp:
     #LED_PIN        = 10     # GPIO pin connected to the pixels (10 uses SPI /dev/spidev0.0).
     LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
     LED_DMA        = 5       # DMA channel to use for generating signal (try 10)
-    LED_BRIGHTNESS = 5       # Set to 0 for darkest and 255 for brightest
+    LED_BRIGHTNESS = 150       # Set to 0 for darkest and 255 for brightest
     LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
     LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
     # Use GRB instead of RGB!
@@ -70,6 +70,9 @@ class Lamp:
     bootstrap = True
 
     BOUNCE_TIME = 200
+
+    pulseThread = None
+    stopPulse = True
 
     def __init__ (self, aio_username, aio_key, debug=False):
 
@@ -117,12 +120,13 @@ class Lamp:
 
         # Intialize the NeoPixel library (must be called once before other functions)
         self.strip.begin()
-        self.strip.setBrightness(150)
+        self.strip.setBrightness(self.LED_BRIGHTNESS)
         # Leds are turned off at the beginning
 
         self.clear()
 
         threading.Thread(target=self.syncColors).start()
+        self.pulseThread = threading.Thread(target=self.newColorReceived)
 
         print('Lamp: Ready\n \
             d         b\n \
@@ -137,6 +141,15 @@ class Lamp:
              b       d     ,\n \
               zzzzzzz       ..oOo\n \
         ')
+    
+    def newColorReceived(self):
+        print("pulsing...")
+        timeout = 10
+        while (not self.stopPulse) or timeout == 0:
+            pulse(self.strip, int(self.currentColor), self.LED_BRIGHTNESS)
+            timeout -= 1
+        self.stopPulse = True
+        print("stop pulsing")
 
     def rollback(self):
         print("Rolling back to last known state....")
@@ -148,14 +161,19 @@ class Lamp:
     @atomicConnection
     def sendColorTimeoutHandler(self,signum, frame):
         print("Lamp: Timeout reached. Sending Color....")
-        self.aio.send(self.colorButtonFeed.key, self.currentColor)
-        time.sleep(2)
+        self.aio.send(self.colorButtonFeed.key, self.currentColor) 
+        time.sleep(2) 
         self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
         print("Lamp: Color sent. Timestamp: " , self.colorUpdateTimestamp)
         self.changingColor = False
 
     def buttonLedCallback(self, channel):
         print("Lamp: Led button Pressed")
+        if self.stopPulse == False:
+            #if it was pulsing wait to stop pulsing
+            self.stopPulse = True
+            self.pulseThread.join()
+
         self.changingColor = True
         # Colors range from 0 to COLORS-1
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
@@ -185,17 +203,37 @@ class Lamp:
         self.lastSavedState = colorButtonData
         #print(colorButtonData.updated_at)
         # If the online value is more recent than local
-        if colorButtonData.updated_at > self.colorUpdateTimestamp or self.bootstrap:
-            if self.bootstrap:
-                self.bootstrap = False
+        if colorButtonData.updated_at > self.colorUpdateTimestamp and not self.bootstrap:
+            print("updating colors")
+            print(colorButtonData)
             self.currentColor = int(colorButtonData.value)
+            self.colorUpdateTimestamp = colorButtonData.updated_at
             showColor(self.strip, self.currentColor)
             print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
+            #received new color, start to pulse 
+            if self.pulseThread.is_alive():
+                #wait for termination of any running thread
+                self.stopPulse = True
+                self.pulseThread.join()
+            self.stopPulse = False
+            self.pulseThread = threading.Thread(target=self.newColorReceived)
+            self.pulseThread.start()
             # Update global timestamp
             #self.aio.send(self.colorButtonFeed.key, self.currentColor)
-        self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-        print("updating colors")
-        print(colorButtonData)
+        if self.bootstrap:
+            #just started the lamp, set to the last color 
+            print("updating colors")
+            print(colorButtonData)
+            self.bootstrap = False
+            self.currentColor = int(colorButtonData.value)
+            self.colorUpdateTimestamp = colorButtonData.updated_at
+            showColor(self.strip, self.currentColor)
+            print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
+            #received new color, start to pulse 
+            # Update global timestamp
+            #self.aio.send(self.colorButtonFeed.key, self.currentColor)
+
+        #self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
         #print("curent update time", self.colorUpdateTimestamp )
 
     def syncColors(self):
@@ -207,4 +245,5 @@ class Lamp:
             time.sleep(10)
 
     def clear (self):
+        self.stopPulse = True
         colorWipe(self.strip, Color(0, 0, 0))
