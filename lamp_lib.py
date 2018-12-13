@@ -13,14 +13,16 @@ def atomicConnection(func):
     def wrapper(self, *args, **kwargs):
         try:
             func(self, *args,**kwargs)            
-            #print("normal execution")
+            #self.logger.debug("normal execution")
         except Exception:
-            print("AN ERROR OCCURRED!!!!")
-            traceback.print_exc()
+            self.logger.debug("AN ERROR OCCURRED!!!!")
+            traceback.self.print_exc()
             self.rollback()
     return wrapper
 
 class Lamp:
+
+    logger = ""
 
     # Set to your Adafruit IO key.
     # Remember, your key is a secret,
@@ -76,10 +78,12 @@ class Lamp:
     pulseThread = None
     stopPulse = True
 
-    def __init__ (self, aio_username, aio_key, debug=False):
+    def __init__ (self, aio_username, aio_key, logger, debug=False):
+
+        self.logger = logger
 
         # Setup buttons GPIO
-        print("Lamp: setting up gpio")
+        self.logger.debug("Lamp: setting up gpio")
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.BUTTON_POWER_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         GPIO.setup(self.BUTTON_COLOR_PIN, GPIO.IN)
@@ -91,7 +95,7 @@ class Lamp:
 
         # Initialize Adafruit IO
         # Create an instance of the REST client
-        print("Lamp: initiating adafruit connection")
+        self.logger.debug("Lamp: initiating adafruit connection")
         self.ADAFRUIT_IO_USERNAME =  aio_username
         self.ADAFRUIT_IO_KEY = aio_key
         self.aio = Client(self.ADAFRUIT_IO_USERNAME, self.ADAFRUIT_IO_KEY)
@@ -110,14 +114,14 @@ class Lamp:
 
         # Retrieve Pi hostname to distinguish lamps
         self.hostname =  check_output(["hostname"]).decode().strip("\ \n \t")
-        print("Lamp: hostname = ", self.hostname)
+        self.logger.debug("Lamp: hostname = %s", self.hostname)
         # Create NeoPixel object with appropriate configuration
         if self.hostname == "flash":
             self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL, self.LED_STRIP)
         elif self.hostname == "priscilla":
             self.strip = Adafruit_NeoPixel(self.LED_COUNT, self.LED_PIN, self.LED_FREQ_HZ, self.LED_DMA, self.LED_INVERT, self.LED_BRIGHTNESS, self.LED_CHANNEL)
         else:
-            print("Invalid hostname!")
+            self.logger.debug("Invalid hostname!")
             exit(1)
 
         # Intialize the NeoPixel library (must be called once before other functions)
@@ -130,7 +134,7 @@ class Lamp:
         threading.Thread(target=self.syncColors).start()
         self.pulseThread = threading.Thread(target=self.newColorReceived)
 
-        print('Lamp: Ready\n \
+        self.logger.debug('Lamp: Ready\n \
             d         b\n \
            d           b\n \
           d             b\n \
@@ -145,32 +149,34 @@ class Lamp:
         ')
     
     def newColorReceived(self):
-        print("pulsing...")
-        timeout = 10
+        self.logger.debug("pulsing...")
+        # 10 minutes
+        timeout = 600
         while (not self.stopPulse) and timeout >= 0:
             pulse(self.strip, int(self.currentColor), self.LED_BRIGHTNESS)
             timeout -= 1
         self.stopPulse = True
-        print("stop pulsing")
+        self.logger.debug("stop pulsing")
 
     def rollback(self):
-        print("Rolling back to last known state....")
+        self.logger.debug("Rolling back to last known state....")
         if self.lastSavedState is not None:
             showColor(self.strip, int(self.lastSavedState.value))
             self.colorUpdateTimestamp = self.lastSavedState.updated_at
+        self.stopPulse = True
         self.changingColor = False
 
     @atomicConnection
     def sendColorTimeoutHandler(self,signum, frame):
-        print("Lamp: Timeout reached. Sending Color....")
+        self.logger.debug("Lamp: Timeout reached. Sending Color....")
         self.aio.send(self.colorButtonFeed.key, self.currentColor) 
         time.sleep(2) 
         self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-        print("Lamp: Color sent. Timestamp: " , self.colorUpdateTimestamp)
+        self.logger.debug("Lamp: Color sent. Timestamp: %s" , self.colorUpdateTimestamp)
         self.changingColor = False
 
     def buttonLedCallback(self, channel):
-        print("Lamp: Led button Pressed")
+        self.logger.debug("Lamp: Led button Pressed")
         if self.stopPulse == False:
             #if it was pulsing wait to stop pulsing
             self.stopPulse = True
@@ -179,39 +185,39 @@ class Lamp:
         self.changingColor = True
         # Colors range from 0 to COLORS-1
         self.currentColor = (self.currentColor+1) % self.LED_COLORS
-        print("current color", self.currentColor)
+        self.logger.debug("current color %s", self.currentColor)
         showColor(self.strip, self.currentColor)
         # Send signal timer
         signal.alarm(self.timeoutSend)
 
     @atomicConnection
     def buttonPowerCallback(self, channel):
-        print("Lamp: Power button Pressed")
+        self.logger.debug("Lamp: Power button Pressed")
         colorWipe(self.strip, Color(0, 0, 0))
         self.currentColor = -1
         colorButtonData = self.aio.receive(self.colorButtonFeed.key)
         self.powerButtonPressTimestamp = colorButtonData.updated_at
 
     def buttonSendCallback(self, channel):
-        print("Lamp: Send button Pressed")
+        self.logger.debug("Lamp: Send button Pressed")
         #self.strip.setBrightness(50)
         # TODO send animation to adafruit io
         #sendAnimation = 1
 
     @atomicConnection
     def doSyncColor(self):
-        print("syncing color")
+        self.logger.debug("syncing color")
         colorButtonData = self.aio.receive(self.colorButtonFeed.key)
         self.lastSavedState = colorButtonData
-        #print(colorButtonData.updated_at)
+        #self.logger.debug("%s",colorButtonData.updated_at)
         # If the online value is more recent than local
         if colorButtonData.updated_at > self.colorUpdateTimestamp and not self.bootstrap:
-            print("updating colors")
-            print(colorButtonData)
+            self.logger.debug("updating colors")
+            self.logger.debug("%s",colorButtonData)
             self.currentColor = int(colorButtonData.value)
             self.colorUpdateTimestamp = colorButtonData.updated_at
             showColor(self.strip, self.currentColor)
-            print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
+            self.logger.debug("Lamp: color updated. Timestamp: %s" , self.colorUpdateTimestamp)
             #received new color, start to pulse 
             if self.pulseThread.is_alive():
                 #wait for termination of any running thread
@@ -224,19 +230,19 @@ class Lamp:
             #self.aio.send(self.colorButtonFeed.key, self.currentColor)
         if self.bootstrap:
             #just started the lamp, set to the last color 
-            print("updating colors")
-            print(colorButtonData)
+            self.logger.debug("updating colors")
+            self.logger.debug("%s", colorButtonData)
             self.bootstrap = False
             self.currentColor = int(colorButtonData.value)
             self.colorUpdateTimestamp = colorButtonData.updated_at
             showColor(self.strip, self.currentColor)
-            print("Lamp: color updated. Timestamp: " , self.colorUpdateTimestamp)
+            self.logger.debug("Lamp: color updated. Timestamp: %s" , self.colorUpdateTimestamp)
             #received new color, start to pulse 
             # Update global timestamp
             #self.aio.send(self.colorButtonFeed.key, self.currentColor)
 
         #self.colorUpdateTimestamp = self.aio.receive(self.colorButtonFeed.key).updated_at
-        #print("curent update time", self.colorUpdateTimestamp )
+        #self.logger.debug("curent update time %s", self.colorUpdateTimestamp )
 
     def syncColors(self):
         """ Function used to synchronize the color of the two lamps, after one has been modified """
